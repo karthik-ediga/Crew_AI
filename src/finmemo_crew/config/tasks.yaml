@@ -1,0 +1,81 @@
+gather_data_task:
+  description: >
+    Gather current data for the stock ticker {ticker}. Use the Market Data
+    Lookup tool to get price, fundamentals, and sector. Use the News Search
+    tool (query something like "{ticker} recent news") to get 3-6 recent,
+    relevant news items. Do not fabricate any field — if a value is
+    unavailable from the tools, state that explicitly.
+  expected_output: >
+    A CompanyData object: ticker, company_name, sector, current_price,
+    market_cap, pe_ratio, fundamentals_raw (a compact summary of the
+    fundamentals you pulled), price_trend_summary, and a list of recent
+    NewsItem entries (headline, source, date, summary).
+  agent: data_gatherer
+
+quant_analysis_task:
+  description: >
+    Using only the CompanyData gathered for {ticker}, analyze valuation
+    ratios (e.g. P/E, forward P/E), growth trend, margin trend, and how
+    they compare to typical sector benchmarks you can reasonably infer.
+    Conclude with a valuation verdict and the reasoning behind it. Do not
+    introduce numbers that weren't in the gathered data.
+  expected_output: >
+    A QuantAnalysis object: valuation_ratios_summary, growth_trend_analysis,
+    margin_analysis, sector_comparison, and valuation_verdict.
+  agent: quant_analyst
+  context:
+    - gather_data_task
+
+risk_assessment_task:
+  description: >
+    Using the CompanyData gathered for {ticker}, identify material risks
+    across financial, competitive, regulatory, macro, and governance
+    categories. Use the News Search tool as needed (e.g. "{ticker} lawsuit",
+    "{ticker} regulatory", "{ticker} downgrade") to check for red flags not
+    already visible in the fundamentals. Rate each flag's severity and cite
+    the evidence behind it.
+  expected_output: >
+    A RiskAssessment object: a list of RiskFlag entries (category,
+    description, severity, evidence), and an overall_risk_level.
+  agent: risk_analyst
+  context:
+    - gather_data_task
+
+write_memo_task:
+  description: >
+    Write a complete investment research memo for {ticker} using the
+    CompanyData, QuantAnalysis, and RiskAssessment produced so far. Include
+    sections: Executive Summary, Company Overview, Financial Analysis, Risk
+    Factors, Bull Case, Bear Case, and a short disclaimer noting this is
+    research-support content, not investment advice, and that it does not
+    constitute a buy/sell/hold recommendation. Every factual or numeric
+    claim must be traceable to the data you were given — do not add outside
+    facts from memory.
+  expected_output: >
+    A complete memo in well-formatted Markdown with the sections listed
+    above.
+  agent: memo_writer
+  context:
+    - gather_data_task
+    - quant_analysis_task
+    - risk_assessment_task
+
+verify_memo_task:
+  description: >
+    Review the draft memo for {ticker} against the CompanyData,
+    QuantAnalysis, and RiskAssessment it was built from. List any claim in
+    the memo that is not supported by that data (unsupported_claims). List
+    any material fact or risk from the underlying data that the memo failed
+    to mention (missing_considerations). List any internal contradictions,
+    such as a bull case that ignores a high-severity risk flag
+    (logical_issues). Set verification_passed to true only if there are no
+    unsupported claims and no major missing considerations.
+  expected_output: >
+    A CritiqueReport object: unsupported_claims, missing_considerations,
+    logical_issues, verification_passed, and a short notes summary.
+  agent: critic
+  context:
+    - gather_data_task
+    - quant_analysis_task
+    - risk_assessment_task
+    - write_memo_task
